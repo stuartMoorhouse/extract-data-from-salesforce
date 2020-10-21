@@ -5,8 +5,8 @@ objects = [
     'Lead',
     'Contact',
     'OpportunityLineItem',
-    # 'OpportunityContractRole',
-    # 'Region',
+    # [is this present?] 'OpportunityContractRole',
+    # [is this present?] 'Region',
     'Campaign',
     'CampaignMember',
     'User'
