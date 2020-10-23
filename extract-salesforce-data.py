@@ -6,6 +6,11 @@ from xml.etree import ElementTree
 import config as config
 
 salesforce_instance = sys.argv[1]
+output_format = sys.argv[2]
+
+if not (output_format == "csv" or output_format == "json"):
+    print('please choose "csv" or "json" output as the second argument')
+    sys.exit(1)
 
 
 def get_session_id():
@@ -14,10 +19,10 @@ def get_session_id():
     loginfile = open("login.txt", "r")
     payload = loginfile.read()
     r = requests.post(url, headers=headers, data=payload)
+
     namespaces = {
         'sforce': 'urn:partner.soap.sforce.com'
     }
-
     dom = ElementTree.fromstring(r.text)
     sessions_id = dom.findall('*//sforce:sessionId', namespaces)
 
@@ -47,17 +52,19 @@ def object_field_names():
        field_names = get_field_names(o)
        names[o] = field_names
 
-    return(names)
+    return names
 
 
-def soql_query(object, fields):
+def soql_query(query_string):
+
     token = get_session_id()
     auth_value = f"Bearer {token}"
     headers = {'Authorization': auth_value}
-    url = f'https://{salesforce_instance}.salesforce.com/services/data/v50.0/query/?q=SELECT+{fields}+FROM+{object}+LIMIT+35'
+    url = f'https://{salesforce_instance}.salesforce.com/{query_string}'
 
     rows_raw = requests.get(url, headers=headers)
     rows_json = rows_raw.json()
+
     return rows_json
 
 
@@ -73,28 +80,44 @@ def values_from_dict_to_csv(dict, keys, sep):
     return row
 
 
-def run_queries():
-    objects = object_field_names()
+def process_results(object, attributes, attributes_string, query_string, count):
+    raw_results = soql_query(query_string)
+    records = raw_results["records"]
 
-    for obj in list(objects.keys()):
+    if output_format == "csv":
         results = []
         results.append("sep=\t")
-        attributes = objects[obj]
-        attributes_string = ','.join(attributes)
         header = '\t'.join(attributes)
         results.append(header)
-        raw_results = soql_query(obj, attributes_string)
-        records = raw_results["records"]
 
         for r in records:
             row = values_from_dict_to_csv(r, attributes, '\t')
             results.append(row)
 
         results_output = "\n".join(results)
-        file_name = f"output/{obj}_records.csv"
+        file_name = f"output/{object}_records_{count}.csv"
         output_file = open(file_name, "w")
         output_file.write(results_output)
         output_file.close()
 
+    elif output_format == "json":
+        for r in records:
+            identifier = r["Id"]
+            file_name = f"output/{object}_{identifier}.json"
+            output_file = open(file_name, "w")
+            output_file.write(json.dumps(r))
+
+    if "nextRecordsUrl" in raw_results:
+        process_results(object, attributes, attributes_string, raw_results["nextRecordsUrl"], count + 1)
+
+
+def run_queries():
+    objs = object_field_names()
+
+    for obj in list(objs.keys()):
+        atts = objs[obj]
+        atts_string = ','.join(atts)
+        query_string = f"""services/data/v50.0/query/?q=SELECT+{atts_string}+FROM+{obj}+LIMIT+350"""
+        process_results(obj, atts, atts_string, query_string, 1)
 
 run_queries()
