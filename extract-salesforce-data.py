@@ -7,6 +7,12 @@ import config as config
 
 salesforce_instance = sys.argv[1]
 output_format = sys.argv[2]
+if len(sys.argv) == 3:
+    SOQL = sys.argv[3]
+else:
+    SOQL = ""
+
+print(SOQL)
 
 if not (output_format == "csv" or output_format == "json"):
     print('please choose "csv" or "json" output as the second argument')
@@ -117,7 +123,7 @@ def run_queries():
     for obj in list(objs.keys()):
         atts = objs[obj]
         atts_string = ','.join(atts)
-        query_string = f"""services/data/v50.0/query/?q=SELECT+{atts_string}+FROM+{obj}+LIMIT+350"""
+        query_string = f"""services/data/v50.0/query/?q=SELECT+{atts_string}+FROM+{obj}{SOQL}"""
         process_results(obj, atts, atts_string, query_string, 1)
 
 run_queries()
